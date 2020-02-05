@@ -20,7 +20,7 @@
         "dist/",
         "ios/",
         "android/",
-        "ByteowlsCapacitorOauth2.podspec"
+        "DaanvanberkelCapacitorOauth2.podspec"
     ],
     "keywords": [
         "capacitor",
