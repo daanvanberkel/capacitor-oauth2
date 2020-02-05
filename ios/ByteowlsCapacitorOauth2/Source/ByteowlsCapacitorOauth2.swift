@@ -234,12 +234,8 @@ public class OAuth2ClientPlugin: CAPPlugin {
                             call.reject("ERR_GENERAL")
                     })
                 } else {
-                    do {
-                        let jsonObj = try JSONSerialization.jsonObject(with: response!.data, options: []) as! JSObject
-                        call.resolve(jsonObj)
-                    } catch {
-                        call.reject("ERR_GENERAL")
-                    }
+                    let data = ["access_token": credential.oauthToken]
+                    call.resolve(data)
                 }
             }
             
