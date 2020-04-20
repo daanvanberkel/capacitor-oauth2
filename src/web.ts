@@ -70,47 +70,34 @@ export class OAuth2ClientPluginWeb extends WebPlugin implements OAuth2ClientPlug
                                 clearInterval(this.intervalId);
                                 // check state
                                 if (urlParamObj.state === this.webOptions.state) {
-                                    if (this.webOptions.responseType === "token") {
-                                        // implicit flow
-                                        let accessToken = urlParamObj.access_token;
-                                        if (accessToken) {
-                                            let tokenObj = { access_token: accessToken };
-                                            this.requestResource(tokenObj, resolve, reject);
-                                        } else {
-                                            reject(new Error("ERR_NO_ACCESS_TOKEN"));
-                                            this.closeWindow();
-                                        }
-                                    } else if (this.webOptions.responseType === "code") {
-                                        // code flow
+                                    if (this.webOptions.accessTokenEndpoint) {
                                         const self = this;
                                         let authorizationCode = urlParamObj.code;
                                         if (authorizationCode) {
-                                            if (!this.webOptions.accessTokenEndpoint) {
-                                                reject(new Error("ERR_PARAM_NO_ACCESS_TOKEN_ENDPOINT"));
-                                            } else {
-                                                const tokenRequest = new XMLHttpRequest();
-                                                tokenRequest.onload = function () {
-                                                    if (this.status === 200) {
-                                                        let accessTokenResponse = JSON.parse(this.response);
-                                                        self.requestResource(accessTokenResponse, resolve, reject);
-                                                    }
-                                                };
-                                                tokenRequest.onerror = function () {
-                                                    console.log("ERR_GENERAL: See client logs. It might be CORS. Status text: " + this.statusText);
-                                                    reject(new Error("ERR_GENERAL"));
-                                                };
-                                                tokenRequest.open("POST", this.webOptions.accessTokenEndpoint, true);
-                                                tokenRequest.setRequestHeader('accept', 'application/json');
-                                                tokenRequest.setRequestHeader('cache-control', 'no-cache');
-                                                tokenRequest.setRequestHeader('content-type', 'application/x-www-form-urlencoded');
-                                                tokenRequest.send(WebUtils.getTokenEndpointData(this.webOptions, authorizationCode));
-                                            }
+                                            const tokenRequest = new XMLHttpRequest();
+                                            tokenRequest.onload = function () {
+                                                if (this.status === 200) {
+                                                    let accessTokenResponse = JSON.parse(this.response);
+                                                    self.requestResource(accessTokenResponse, resolve, reject);
+                                                }
+                                            };
+                                            tokenRequest.onerror = function () {
+                                                console.log("ERR_GENERAL: See client logs. It might be CORS. Status text: " + this.statusText);
+                                                reject(new Error("ERR_GENERAL"));
+                                            };
+                                            tokenRequest.open("POST", this.webOptions.accessTokenEndpoint, true);
+                                            tokenRequest.setRequestHeader('accept', 'application/json');
+                                            tokenRequest.setRequestHeader('cache-control', 'no-cache');
+                                            tokenRequest.setRequestHeader('content-type', 'application/x-www-form-urlencoded');
+                                            tokenRequest.send(WebUtils.getTokenEndpointData(this.webOptions, authorizationCode));
                                         } else {
                                             reject(new Error("ERR_NO_AUTHORIZATION_CODE"));
                                         }
                                         this.closeWindow();
+                                    } else {
+                                        // if no accessTokenEndpoint exists request the resource
+                                        this.requestResource(urlParamObj, resolve, reject);
                                     }
-                                    // can not happen because checked earlier
                                 } else {
                                     reject(new Error("ERR_STATES_NOT_MATCH"));
                                     this.closeWindow();
@@ -154,6 +141,7 @@ export class OAuth2ClientPluginWeb extends WebPlugin implements OAuth2ClientPlug
                 this.closeWindow();
             }
         } else {
+            // if no resource url exists just return the accessToken response
             resolve(tokenObj);
             this.closeWindow();
         }

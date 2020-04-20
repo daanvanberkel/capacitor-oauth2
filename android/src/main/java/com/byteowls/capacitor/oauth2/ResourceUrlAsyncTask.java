@@ -33,15 +33,24 @@ public class ResourceUrlAsyncTask extends AsyncTask<String, Void, ResourceCallRe
     @Override
     protected ResourceCallResult doInBackground(String... tokens) {
         String resourceUrl = options.getResourceUrl();
+        ResourceCallResult result = new ResourceCallResult();
+        String accessToken = tokens[0];
+
+        if (resourceUrl == null) {
+            JSObject json = new JSObject();
+            json.put("access_token", accessToken);
+            result.setResponse(json);
+            return result;
+        }
+
         try {
             URL url = new URL(resourceUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            String accessToken = tokens[0];
             conn.addRequestProperty("Authorization", String.format("Bearer %s", accessToken));
             try {
                 InputStream is;
 
-                ResourceCallResult result = new ResourceCallResult();
+
                 if (conn.getResponseCode() >= HttpURLConnection.HTTP_OK
                     && conn.getResponseCode() < HttpURLConnection.HTTP_MULT_CHOICE) {
                     is = conn.getInputStream();

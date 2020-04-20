@@ -5,13 +5,36 @@
 [![npm](https://img.shields.io/npm/dt/@byteowls/capacitor-oauth2.svg?label=npm%20downloads)](https://www.npmjs.com/package/@byteowls/capacitor-oauth2)
 [![Twitter Follow](https://img.shields.io/twitter/follow/michaelowl_web.svg?style=social&label=Follow&style=flat-square)](https://twitter.com/michaelowl_web)
 
-This is a simple OAuth 2 client plugin. 
-
-It does **not support OpenId** but it might in future. See #49 ;)
+This is a simple OAuth 2 client plugin. **No OpenID** support!
 
 It let you configure the oauth parameters yourself instead of using SDKs. Therefore it is usable with various providers.
+See [providers](#list-of-providers) the community has already used this plugin with.
+
+## Versions
+
+| Plugin | Minimum Capacitor | Docs                                                                                   | Notes                          |
+|--------|-------------------|----------------------------------------------------------------------------------------|--------------------------------|
+| 2.x    | 2.0.0             | [README](https://github.com/moberwasserlechner/capacitor-oauth2/blob/master/README.md) | XCode 11.4 needs this version  |
+| 1.x    | 1.0.0             | [README](https://github.com/moberwasserlechner/capacitor-oauth2/blob/1.1.0/README.md)  |                                |
+
+For further details on what has changed see the [CHANGELOG](https://github.com/moberwasserlechner/capacitor-oauth2/blob/master/CHANGELOG.md).
 
 ## Supported flows
+
+Starting with version **2.0.0** the plugin will no longer restrict the `responseType` to `token` or `code`.
+
+Developers can configure anything. It is their responsibility to use the options the chosen OAuth Provider supports.
+
+The plugin on the other will behave differently depending on the existence of certain config parameters:
+
+These parameters are:
+
+* `accessTokenEndpoint`
+* `resourceUrl`
+
+e.g.
+
+If `responseType=code`, `pkceDisable=true` and `accessTokenEndpoint` is missing the `authorizationCode` will be resolve along with the whole authorization response.
 
 ### Implicit flow (response type: token)
 
@@ -33,7 +56,7 @@ That flow should only be used on the backend (server).
 
 `npm i -E @byteowls/capacitor-oauth2`
 
-Minimum Capacitor version is **1.0.0**
+Minimum Capacitor version is **2.0.0**
 
 ## Configuration
 
@@ -78,11 +101,14 @@ export class SignupComponent {
     onOAuthBtnClick() {
         Plugins.OAuth2Client.authenticate(
             oauth2Options
-        ).then(resourceUrlResponse => {
-            let accessToken = resourceUrlResponse["access_token"];
-            let oauthUserId = resourceUrlResponse["id"];
-            let name = resourceUrlResponse["name"];
-            this.refreshToken = resourceUrlResponse["refresh_token"];
+        ).then(response => {
+            let accessToken = response["access_token"];
+            this.refreshToken = response["refresh_token"];
+
+            // only if you include a resourceUrl protected user values are included in the response!
+            let oauthUserId = response["id"];
+            let name = response["name"];
+
             // go to backend
         }).catch(reason => {
             console.error("OAuth rejected", reason);
@@ -121,23 +147,29 @@ export class SignupComponent {
 
 ### Options
 
-See the `oauth2Options` and `OAuth2RefreshTokenOptions` interface at https://github.com/moberwasserlechner/capacitor-oauth2/blob/master/src/definitions.ts
+See the `oauth2Options` and `oauth2RefreshOptions` interfaces at https://github.com/moberwasserlechner/capacitor-oauth2/blob/master/src/definitions.ts
+
+**NOTE:** Configuring a `resourceUrl` is optional.
+But be aware that only the parameters from the accessToken request are included in the plugin's response if you do so!
 
 ### Error Codes
 
 * ERR_PARAM_NO_APP_ID ... The appId / clientId is missing. (web, android, ios)
 * ERR_PARAM_NO_AUTHORIZATION_BASE_URL ... The authorization base url is missing. (web, android, ios)
+* ERR_PARAM_NO_RESPONSE_TYPE ... The response type is missing. (web, android, ios)
 * ERR_PARAM_NO_REDIRECT_URL ... The redirect url / custom scheme url is missing. (web, android, ios)
 * ERR_PARAM_NO_ACCESS_TOKEN_ENDPOINT ... The access token endpoint url is missing. It is only needed if code flow is used. (web, android, ios)
 * ERR_PARAM_INVALID_RESPONSE_TYPE ... You configured a invalid responseType. Only "token" or "code" are allowed. (web, android, ios)
 * ERR_PARAM_NO_REFRESH_TOKEN ... The refresh token is missing (only when obtaining an access token based on a refresh token, android/ios)
+* ERR_AUTHORIZATION_FAILED ... The authorization failed.
 * ERR_NO_ACCESS_TOKEN ... No access_token found. (web, android)
 * ERR_NO_AUTHORIZATION_CODE ... No authorization code was returned in the redirect response. (web, android, ios)
 * ERR_STATES_NOT_MATCH ... The state included in the authorization code request does not match the one in the redirect. Security risk! (web, android, ios)
 * USER_CANCELLED ... The user cancelled the login flow. (web, android, ios)
 * ERR_CUSTOM_HANDLER_LOGIN ... Login through custom handler class failed. See logs and check your code. (android, ios)
 * ERR_CUSTOM_HANDLER_LOGOUT ... Logout through custom handler class failed. See logs and check your code. (android, ios)
-* ERR_ANDROID_NO_BROWSER ... On Android not suitable browser could be found! (android)
+* ERR_ANDROID_NO_BROWSER ... No suitable browser could be found! (Android)
+* ERR_ANDROID_RESULT_NULL ... The auth result is null. The intent in the ActivityResult is null. This might be a valid state but make sure you configured Android part correctly! See [Platform Android](#platform-android)
 * ERR_GENERAL ... A unspecific error. Check the logs to see want exactly happened. (web, android, ios)
 
 ## Platform: Web/PWA
@@ -149,24 +181,87 @@ impact using this plugin in a web application.
 
 ## Platform: Android
 
-**Register the plugin** in `com.companyname.appname.MainActivity#onCreate`
+Prerequisite: [Capacitor Android Docs](https://capacitor.ionicframework.com/docs/android/configuration)
 
-```
+### Register the plugin
+
+The plugin must be manually added to your `com.companyname.appname.MainActivity`.
+See the [Capacitor Docs](https://capacitor.ionicframework.com/docs/plugins/android#export-to-capacitor) or below:
+
+```java
+// Other imports...
+import com.byteowls.capacitor.oauth2.OAuth2ClientPlugin;
+
+public class MainActivity extends BridgeActivity {
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        List<Class<? extends Plugin>> additionalPlugins = new ArrayList<>();
-        // Additional plugins you've installed go here
-        // Ex: additionalPlugins.add(TotallyAwesomePlugin.class);
-        additionalPlugins.add(OAuth2ClientPlugin.class);
-
         // Initializes the Bridge
-        this.init(savedInstanceState, additionalPlugins);
+        this.init(savedInstanceState, new ArrayList<Class<? extends Plugin>>() {{
+            // Additional plugins you've installed go here
+            // Ex: add(TotallyAwesomePlugin.class);
+            add(OAuth2ClientPlugin.class);
+        }});
     }
+}
 ```
 
-**Custom OAuth Handler**
+### Android Default Config
+
+Skip this, if you use a [OAuth2CustomHandler](#custom-oauth-handler)
+
+#### AndroidManifest.xml
+The `AndroidManifest.xml` in your Capacitor Android project already contains
+```xml
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="@string/custom_url_scheme" />
+    </intent-filter>
+```
+
+Find the line
+```xml
+<data android:scheme="@string/custom_url_scheme" />
+```
+and change it to
+```xml
+<data android:scheme="@string/custom_url_scheme" android:host="oauth" />
+```
+Note: Actually any value for `android:host` will do. It does not has to be `oauth`.
+
+This will fix an issues within the oauth workflow when the application is shown twice.
+See [Issue #15](https://github.com/moberwasserlechner/capacitor-oauth2/issues/15) for details what happens.
+
+#### android/app/build.gradle
+
+```groovy
+android.defaultConfig.manifestPlaceholders = [
+  "appAuthRedirectScheme": "<@string/custom_url_scheme from string.xml>"
+]
+```
+
+**Troubleshooting**
+
+1) If your `appAuthRedirectScheme` does not get recognized because you are using a library that replaces it
+(e.g.: onesignal-cordova-plugin), you will have to add it to your `buildTypes` like the following:
+
+```groovy
+android.buildTypes.debug.manifestPlaceholders =  [
+  'appAuthRedirectScheme': '<@string/custom_url_scheme from string.xml>' // e.g. com.companyname.appname
+]
+android.buildTypes.release.manifestPlaceholders = [
+  'appAuthRedirectScheme': '<@string/custom_url_scheme from string.xml>' // e.g. com.companyname.appname
+]
+```
+
+2) "ERR_ANDROID_RESULT_NULL": See [Issue #52](https://github.com/moberwasserlechner/capacitor-oauth2/issues/52#issuecomment-525715515) for details.
+I cannot reproduce this behaviour. Moreover there might be situation this state is valid. In other cases e.g. in the linked issue a configuration tweak fixed it.
+
+### Custom OAuth Handler
 
 Some OAuth provider (Facebook) force developers to use their SDK on Android.
 
@@ -180,92 +275,14 @@ See a full working example below!
 
 ## Platform: iOS
 
-On iOS the plugin is registered automatically by Capacitor.
+### Register plugin
+On iOS the plugin is registered **automatically** by Capacitor.
 
-**Custom OAuth Handler**
+### iOS Default Config
 
-Some OAuth provider (Facebook) force developers to use their SDK on iOS.
+Skip this, if you use a [OAuth2CustomHandler](#custom-oauth-handler-1)
 
-This plugin should be as generic as possible so I don't want to include provider specific dependencies.
-
-Therefore I created a mechanism which let developers integrate custom SDK features in this plugin.
-Simply configure a the class name in the option property `ios.customHandlerClass`.
-This class has to implement `ByteowlsCapacitorOauth2.OAuth2CustomHandler`.
-
-See a full working example below!
-
-
-## Platform: Electron
-
-- Maybe early 2019
-
-## Full examples
-
-### Google
-
-**PWA**
-```typescript
-googleLogin() {
-    Plugins.OAuth2Client.authenticate({
-      appId: environment.oauthAppId.google.web,
-      authorizationBaseUrl: "https://accounts.google.com/o/oauth2/auth",
-      accessTokenEndpoint: "https://www.googleapis.com/oauth2/v4/token",
-      scope: "email profile",
-      resourceUrl: "https://www.googleapis.com/userinfo/v2/me",
-      web: {
-        redirectUrl: "http://localhost:4200",
-        windowOptions: "height=600,left=0,top=0"
-      },
-      android: {
-        appId: environment.oauthAppId.google.android,
-        responseType: "code", // if you configured a android app in google dev console the value must be "code"
-        customScheme: "com.companyname.appname:/" // package name from google dev console
-      },
-      ios: {
-        appId: environment.oauthAppId.google.ios,
-        responseType: "code", // if you configured a ios app in google dev console the value must be "code"
-        customScheme: "com.companyname.appname:/" // Bundle ID from google dev console
-      }
-    }).then(resourceUrlResponse => {
-      // do sth e.g. check with your backend
-    }).catch(reason => {
-      console.error("Google OAuth rejected", reason);
-    });
-  }
-```
-
-#### Android
-
-Add the value of the `android.customScheme` parameter in `android/app/build.gradle` as well, but remove the suffix `:/`
-
-Then in your `AndroidManifest.xml` file find the line
-```
-<data android:scheme="@string/custom_url_scheme" />
-```
-and change it to
-```
-<data android:scheme="@string/custom_url_scheme" android:host="oauth" />
-```
-Note: Actually any value for `android:host` will do. It does not has to be `oauth`.
-
-This will fix an issues within the oauth workflow when the application is shown twice.
-See [Issue #15](https://github.com/moberwasserlechner/capacitor-oauth2/issues/15) for details what happens.
-
-Notice: If your appAuthRedirectScheme doesn't get recognized because you are using a library that replaces it
-(e.g.: onesignal-cordova-plugin), you will have to add it to your buildTypes like the following:
-
-```
-android.buildTypes.debug.manifestPlaceholders =  [
-  'appAuthRedirectScheme': 'com.companyname.appname'
-]
-android.buildTypes.release.manifestPlaceholders = [
-  'appAuthRedirectScheme': 'com.companyname.appname'
-]
-```
-
-#### iOS
-
-Open `ios/App/App/Info.plist` in a XML editor and add the customScheme without `:/` like that
+Open `ios/App/App/Info.plist` in XCode and add the value of `redirectUrl` from your config without `:/` like that
 
 ```xml
 	<key>CFBundleURLTypes</key>
@@ -279,6 +296,78 @@ Open `ios/App/App/Info.plist` in a XML editor and add the customScheme without `
 	</array>
 ```
 
+### Custom OAuth Handler
+
+Some OAuth provider (e.g. Facebook) force developers to use their SDK on iOS.
+
+This plugin should be as generic as possible so I don't want to include provider specific dependencies.
+
+Therefore I created a mechanism which let developers integrate custom SDK features in this plugin.
+Simply configure a the class name in the option property `ios.customHandlerClass`.
+This class has to implement `ByteowlsCapacitorOauth2.OAuth2CustomHandler`.
+
+See a full working example below!
+
+
+## Platform: Electron
+
+- No timeline.
+
+## List of Providers
+
+These are some of the providers that can be configured with this plugin. I'm happy to add others ot the list, if you let me know.
+
+| Name     | Example (config,...)   | Notes |
+|----------|------------------------|-------|
+| Google   | [see below](#google)   |       |
+| Facebook | [see below](#facebook) |       |
+
+
+## Full examples
+
+### Google
+
+**PWA**
+```typescript
+googleLogin() {
+    Plugins.OAuth2Client.authenticate({
+      authorizationBaseUrl: "https://accounts.google.com/o/oauth2/auth",
+      accessTokenEndpoint: "https://www.googleapis.com/oauth2/v4/token",
+      scope: "email profile",
+      resourceUrl: "https://www.googleapis.com/userinfo/v2/me",
+      web: {
+        appId: environment.oauthAppId.google.web,
+        responseType: "token", // implicit flow
+        accessTokenEndpoint: "", // clear the tokenEndpoint as we know that implicit flow gets the accessToken from the authorizationRequest
+        redirectUrl: "http://localhost:4200",
+        windowOptions: "height=600,left=0,top=0"
+      },
+      android: {
+        appId: environment.oauthAppId.google.android,
+        responseType: "code", // if you configured a android app in google dev console the value must be "code"
+        redirectUrl: "com.companyname.appname:/" // package name from google dev console
+      },
+      ios: {
+        appId: environment.oauthAppId.google.ios,
+        responseType: "code", // if you configured a ios app in google dev console the value must be "code"
+        redirectUrl: "com.companyname.appname:/" // Bundle ID from google dev console
+      }
+    }).then(resourceUrlResponse => {
+      // do sth e.g. check with your backend
+    }).catch(reason => {
+      console.error("Google OAuth rejected", reason);
+    });
+  }
+```
+
+#### Android
+
+See [Android Default Config](#android-default-config)
+
+#### iOS
+
+See [iOS Default Config](#ios-default-config)
+
 ### Facebook
 
 **PWA**
@@ -289,9 +378,9 @@ facebookLogin() {
     Plugins.OAuth2Client.authenticate({
       appId: "YOUR_FACEBOOK_APP_ID",
       authorizationBaseUrl: "https://www.facebook.com/v" + fbApiVersion + "/dialog/oauth",
-      accessTokenEndpoint:  "https://graph.facebook.com/v" + fbApiVersion + "/oauth/access_token",
       resourceUrl: "https://graph.facebook.com/v" + fbApiVersion + "/me",
       web: {
+        responseType: "token",
         redirectUrl: "http://localhost:4200",
         windowOptions: "height=600,left=0,top=0"
       },
@@ -367,13 +456,17 @@ import android.app.Activity;
 
 import com.byteowls.capacitor.oauth2.handler.AccessTokenCallback;
 import com.byteowls.capacitor.oauth2.handler.OAuth2CustomHandler;
-import com.byteowls.teamconductor.MainActivity;
+import com.companyname.appname.MainActivity;
 import com.facebook.AccessToken;
 import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
+import com.facebook.login.DefaultAudience;
+import com.facebook.login.LoginBehavior;
 import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
 import com.getcapacitor.PluginCall;
+
+import java.util.Collections;
 
 public class YourAndroidFacebookOAuth2Handler implements OAuth2CustomHandler {
 
@@ -383,8 +476,10 @@ public class YourAndroidFacebookOAuth2Handler implements OAuth2CustomHandler {
     if (AccessToken.isCurrentAccessTokenActive()) {
       callback.onSuccess(accessToken.getToken());
     } else {
-      LoginManager.getInstance().logInWithReadPermissions(activity, null);
-
+      LoginManager l = LoginManager.getInstance();
+      l.logInWithReadPermissions(activity, Collections.singletonList("public_profile"));
+      l.setLoginBehavior(LoginBehavior.WEB_ONLY);
+      l.setDefaultAudience(DefaultAudience.NONE);
       LoginManager.getInstance().registerCallback(((MainActivity) activity).getCallbackManager(), new FacebookCallback<LoginResult>() {
         @Override
         public void onSuccess(LoginResult loginResult) {
@@ -406,11 +501,10 @@ public class YourAndroidFacebookOAuth2Handler implements OAuth2CustomHandler {
   }
 
   @Override
-  public boolean logout(PluginCall pluginCall) {
+  public boolean logout(Activity activity, PluginCall pluginCall) {
     LoginManager.getInstance().logOut();
     return true;
   }
-
 }
 
 ```
@@ -516,49 +610,48 @@ import ByteowlsCapacitorOauth2
 
 @objc class YourIOsFacebookOAuth2Handler: NSObject, OAuth2CustomHandler {
 
-    var loginManager: LoginManager?;
-
     required override init() {
     }
 
     func getAccessToken(viewController: UIViewController, call: CAPPluginCall, success: @escaping (String) -> Void, cancelled: @escaping () -> Void, failure: @escaping (Error) -> Void) {
-
         if let accessToken = AccessToken.current {
             success(accessToken.tokenString)
         } else {
             DispatchQueue.main.async {
-                if self.loginManager == nil {
-                    self.loginManager = LoginManager()
+                let loginManager = LoginManager()
+                // I only need the most basic permissions but others are available
+                loginManager.logIn(permissions: [ .publicProfile ], viewController: viewController) { result in
+                    switch result {
+                    case .success(_, _, let accessToken):
+                        success(accessToken.tokenString)
+                    case .failed(let error):
+                        failure(error)
+                    case .cancelled:
+                        cancelled()
+                    }
                 }
-
-                self.loginManager!.logIn(permissions: [ .publicProfile ],
-                                         viewController: viewController, completion: { loginResult in
-                                            switch loginResult {
-                                            case .failed(let error):
-                                                failure(error)
-                                            case .cancelled:
-                                                cancelled()
-                                            case .success(_, _, let accessToken):
-                                                success(accessToken.tokenString)
-                                            }
-                })
             }
         }
     }
 
-    func logout(call: CAPPluginCall) -> Bool {
-        self.loginManager?.logOut()
+    func logout(viewController: UIViewController, call: CAPPluginCall) -> Bool {
+        let loginManager = LoginManager()
+        loginManager.logOut()
         return true
     }
 }
 ```
 
 This handler will be automatically discovered up by the plugin and handles the login using the Facebook SDK.
+See https://developers.facebook.com/docs/swift/login/#custom-login-button for details.
 
-4) Add the following to `ios/App/App/AppDelegate.swift`
+4) The users that have redirect problem after success grant add the following code to `ios/App/App/AppDelegate.swift`.
+This code correctly delegate the FB redirect url to be managed by Facebook SDK.
 
 ```swift
 import UIKit
+import FacebookCore
+import FacebookLogin
 import Capacitor
 
 @UIApplicationMain
@@ -573,8 +666,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       // but if you want the App API to support tracking app url opens, make sure to keep this call
 
       if let scheme = url.scheme, let host = url.host {
-        if scheme == "fb\(SDKSettings.appId)" && host == "authorize" {
-          return SDKApplicationDelegate.shared.application(app, open: url, options: options)
+        let appId: String = Settings.appID!
+        if scheme == "fb\(appId)" && host == "authorize" {
+          return ApplicationDelegate.shared.application(app, open: url, options: options)
         }
       }
 
@@ -584,46 +678,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // other methods
 }
 ```
-This might not be needed but some users had an issue without it.
 
 ## Contribute
 
-### Fix a bug or create a new feature
-
-Please do not mix more than one issue in a feature branch. Each feature/bugfix should have its own branch and its own Pull Request (PR).
-
-1. Create a issue and describe what you want to do at [Issue Tracker](https://github.com/moberwasserlechner/capacitor-oauth2/issues)
-2. Create your feature branch (`git checkout -b feature/my-feature` or `git checkout -b bugfix/my-bugfix`)
-3. Test your changes to the best of your ability.
-5. Commit your changes (`git commit -m 'Describe feature or bug'`)
-6. Push to the branch (`git push origin feature/my-feature`)
-7. Create a Github pull request
-
-### Code Style
-
-This repo includes a .editorconfig file, which your IDE should pickup automatically.
-
-If not please use the sun coding convention. Please do not use tabs at all!
-
-Try to change only parts your feature or bugfix requires.
+See [Contribution Guidelines](https://github.com/moberwasserlechner/capacitor-oauth2/blob/master/.github/CONTRIBUTING.md).
 
 ## Changelog
 See [CHANGELOG](https://github.com/moberwasserlechner/capacitor-oauth2/blob/master/CHANGELOG.md).
 
 ## License
 
-MIT. Please see [LICENSE](https://github.com/moberwasserlechner/capacitor-oauth2/blob/master/LICENSE).
+MIT. See [LICENSE](https://github.com/moberwasserlechner/capacitor-oauth2/blob/master/LICENSE).
 
 ## BYTEOWLS Software & Consulting
 
-This plugin is powered by BYTEOWLS Software & Consulting and was build for [Team Conductor](https://team-conductor.com/en/) - Next generation club management platform.
-
-### Commercial support and consulting
-
-We create plugins for apps we build and share them **as it is** with the community.
-
-I you have a feature request, need support how to use the plugin or 
-need a release breaking with our normal release cycle you have the possibility 
-to sponsor the development by paying for this custom development or support.
-
-See the wiki page for how to request a quote.
+This plugin is powered by [BYTEOWLS Software & Consulting](https://byteowls.com) and was build for [Team Conductor](https://team-conductor.com/en/) - Next generation club management platform.

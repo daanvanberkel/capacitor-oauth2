@@ -12,7 +12,7 @@ export class WebUtils {
 
     static getOverwritableValue<T>(options: OAuth2AuthenticateOptions | any, key: string): T {
         let base = options[key];
-        if (options.web && options.web[key]) {
+        if (options.web && key in options.web) {
             base = options.web[key];
         }
         return base;
@@ -63,10 +63,10 @@ export class WebUtils {
         if (urlString && urlString.trim().length > 0) {
             urlString = urlString.trim();
             let idx = urlString.indexOf("#");
-            if (idx == -1) {
+            if (idx === -1) {
                 idx = urlString.indexOf("?");
             }
-            if (idx != -1 && urlString.length > (idx + 1)) {
+            if (idx !== -1 && urlString.length > (idx + 1)) {
                 const urlParamStr = urlString.slice(idx + 1);
                 const keyValuePairs: string[] = urlParamStr.split(`&`);
                 return keyValuePairs.reduce((acc, hash) => {
@@ -98,13 +98,18 @@ export class WebUtils {
     static async buildWebOptions(configOptions: OAuth2AuthenticateOptions): Promise<WebOptions> {
         const webOptions = new WebOptions();
         webOptions.appId = this.getAppId(configOptions);
+        webOptions.authorizationBaseUrl = this.getOverwritableValue(configOptions, "authorizationBaseUrl");
         webOptions.responseType = this.getOverwritableValue(configOptions, "responseType");
-        webOptions.pkceDisabled = this.getOverwritableValue(configOptions, "pkceDisabled");
         if (!webOptions.responseType) {
             webOptions.responseType = "token";
         }
+        webOptions.redirectUrl = this.getOverwritableValue(configOptions, "redirectUrl");
+        // controlling parameters
+        webOptions.resourceUrl = this.getOverwritableValue(configOptions, "resourceUrl");
+        webOptions.accessTokenEndpoint = this.getOverwritableValue(configOptions, "accessTokenEndpoint");
 
-        if (webOptions.responseType == "code") {
+        webOptions.pkceDisabled = this.getOverwritableValue(configOptions, "pkceDisabled");
+        if (webOptions.responseType === "code") {
             if (!webOptions.pkceDisabled) {
                 webOptions.pkceCodeVerifier = this.randomString(64);
                 if (CryptoUtils.HAS_SUBTLE_CRYPTO) {
@@ -118,17 +123,11 @@ export class WebUtils {
                 }
             }
         }
-
-        webOptions.authorizationBaseUrl = configOptions.authorizationBaseUrl;
-        webOptions.accessTokenEndpoint = configOptions.accessTokenEndpoint;
-        webOptions.resourceUrl = configOptions.resourceUrl;
-        webOptions.scope = configOptions.scope;
-        webOptions.state = configOptions.state;
+        webOptions.scope = this.getOverwritableValue(configOptions, "scope");
+        webOptions.state = this.getOverwritableValue(configOptions, "state");
         if (!webOptions.state || webOptions.state.length === 0) {
             webOptions.state = this.randomString(20);
         }
-        webOptions.redirectUrl = configOptions.web.redirectUrl;
-
         let mapHelper = this.getOverwritableValue<{[key: string]: string}>(configOptions, "additionalParameters");
         if (mapHelper) {
             webOptions.additionalParameters = {};
